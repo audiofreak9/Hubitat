@@ -1,17 +1,23 @@
 /**
- *  ---- Original Header ----
+ *  ****************  Location Tracker User Driver  ****************
  *
- *  Life360 with States - Hubitat Port
+ *  Design Usage:
+ *  This driver stores the user data to be used with Location Tracker.
  *
- *	BTRIAL DISTANCE AND SLEEP PATCH 29-12-2017
- *	Updated Code to handle distance from, and sleep functionality
+ *  Copyright 2020 Bryan Turcotte (@bptworld)
+ *  
+ *  This App is free.  If you like and use this app, please be sure to mention it on the Hubitat forums!  Thanks.
  *
- *	TMLEAFS REFRESH PATCH 06-12-2016 V1.1
- *	Updated Code to match Smartthings updates 12-05-2017 V1.2
- *	Added updateMember function that pulls all usefull information Life360 provides for webCoRE use V2.0
- *	
- *  Copyright 2014 Jeff's Account
+ *  Remember...I am not a programmer, everything I do takes a lot of time and research (then MORE research)!
+ *  Donations are never necessary but always appreciated.  Donations to support development efforts are accepted via: 
  *
+ *  Paypal at: https://paypal.me/bptworld
+ * 
+ *  Unless noted in the code, ALL code contained within this app is mine. You are free to change, ripout, copy, modify or
+ *  otherwise use the code in anyway you want. This is a hobby, I'm more than happy to share what I have learned and help
+ *  the community grow. Have FUN with it!
+ * 
+ * ------------------------------------------------------------------------------------------------------------------------------
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  *  in compliance with the License. You may obtain a copy of the License at:
  *
@@ -21,695 +27,635 @@
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License
  *  for the specific language governing permissions and limitations under the License.
  *
- * ---- End of original header ----
+ * ------------------------------------------------------------------------------------------------------------------------------
  *
- * ---- New Header ----
+ *  If modifying this project, please keep the above header intact and add your comments/credits below - Thank you! -  @BPTWorld
  *
- *  ****************  L360 with States App  ****************
- *
- *  Design Usage:
- *  Life360 with all States included
- *
- *  Copyright 2019-2020 Bryan Turcotte (@bptworld)
- *  
- *  This App is free.  If you like and use this app, please be sure to mention it on the Hubitat forums!  Thanks.
- *
- *  Remember...I am not a programmer, everything I do takes a lot of time and research!
- *  Donations are never necessary but always appreciated.  Donations to support development efforts are accepted via: 
- *
- *  Paypal at: https://paypal.me/bptworld
+ *  App and Driver updates can be found at https://github.com/bptworld/Hubitat
  *
  * ------------------------------------------------------------------------------------------------------------------------------
  *
- *  Special thanks goes out to @cwwilson08 for working on and figuring out the oauth stuff!
- *  This would not be possible without his work.
+ *  Special thanks to namespace: "tmleafs", author: "tmleafs" for the work on the Life360 ST driver
  *
  *  Changes:
  *
- *  2.0.9 - 10/07/20 - Attempting fix for jumping GPS
- *  2.0.8 - 09/26/20 - Testing Fix by @jpoeppelman1
- *  2.0.7 - 08/25/20 - Added more error catching
- *  2.0.6 - 06/01/20 - Added code to remove devices if app is uninstalled
- *  2.0.5 - 04/27/20 - Cosmetic changes
- *  2.0.4 - 04/15/20 - Code adjustments, container driver no longer used. New devices need to be created.
- *  2.0.3 - 04/01/20 - Added a timeout to get http commands
- *  2.0.2 - 01/21/20 - Adjusted app to work with new driver
- *  2.0.1 - 01/03/20 - Adjusted logging to not show sensitive data
- *  ---
- *  v1.0.0 - 06/30/19 - Initial port of ST app (cwwilson08) (bptworld)
+ *  1.0.6 - 06/17/20 - Added code for address1prev, other adjustments
+ *  1.0.5 - 05/31/20 - Adjustments
+ *  1.0.4 - 05/30/20 - Fix for History
+ *  1.0.3 - 05/30/20 - Cosmetic Change - Recommended to delete device and recreate.
+ *  1.0.2 - 05/29/20 - Adjusted placement of date/time stamp, made tile 'smartly' friendly
+ *  1.0.1 - 04/12/20 - Added last updated date/time to StatusTile1, other small adjustments
+ *  1.0.0 - 01/18/20 - Initial release
  */
 
 import java.text.SimpleDateFormat
 
-def setVersion(){
-    state.name = "Life360 with States"
-	state.version = "2.0.9"
-}
+metadata {
+	definition (name: "Location Tracker User Driver", namespace: "BPTWorld", author: "Bryan Turcotte", importUrl: "") {
+        capability "Actuator"
+        
+        // **** Life360 ****
+	    capability "Presence Sensor"
+	    capability "Sensor"
+        capability "Refresh"
+        capability "Battery"
+        capability "Power Source"
 
-definition(
-    name: "Life360 with States",
-    namespace: "BPTWorld",
-    author: "Bryan Turcotte",
-    description: "Life360 with all States Included",
-	category: "",
-    iconUrl: "",
-    iconX2Url: "",
-    oauth: [displayName: "Life360", displayLink: "Life360"],
-    singleInstance: true,
-    importUrl: "https://raw.githubusercontent.com/bptworld/Hubitat/master/Ported/Life360/L-app.groovy",
-) {
-	appSetting "clientId"
-	appSetting "clientSecret"
+        attribute "address1", "string"
+        attribute "address1prev", "string"
+        attribute "avatar", "string"
+        attribute "avatarHtml", "string"
+  	    attribute "battery", "number"
+   	    attribute "charge", "boolean" //boolean
+	    attribute "distanceMetric", "Number"
+   	    attribute "distanceKm", "number"
+	    attribute "distanceMiles", "Number"
+	    attribute "bpt-history", "string"
+       	attribute "inTransit", "string" //boolean
+   	    attribute "isDriving", "string" //boolean
+        attribute "lastLogMessage", "string"
+        attribute "lastMap", "string"
+        attribute "lastUpdated", "string"
+   	    attribute "latitude", "number"
+   	    attribute "longitude", "number"
+        attribute "numOfCharacters", "number"
+        attribute "savedPlaces", "map"
+   	    attribute "since", "number"
+   	    attribute "speedMetric", "number"
+        attribute "speedMiles", "number"
+        attribute "speedKm", "number"
+        attribute "status", "string"
+        attribute "bpt-statusTile1", "string"
+        attribute "MurnControl-statusTile1", "string"
+   	    attribute "wifiState", "boolean" //boolean
+        
+        // extra attributes for Location Tracker
+        //attribute "address1", "string"
+        attribute "activity", "string"
+        attribute "avatarURL", "string"
+        //attribute "battery", "number"
+        attribute "currentCity", "string"
+        attribute "currentState", "string"
+        attribute "currentpostalCode", "string"
+        attribute "lastUpdateDate", "string"
+        attribute "lastUpdateTime", "string"
+		//attribute "latitude", "number"
+        //attribute "longitude", "number"
+        attribute "locAlt", "number"
+        attribute "locSpd", "number"
+        attribute "mapURL", "string"
+        //attribute "wifiState", "string"
+        
+        // **** Life360 ****
+	    command "refresh"
+        command "setBattery",["number","boolean"]
+        command "sendHistory", ["string"]
+        command "sendTheMap", ["string"]
+        command "historyClearData"
+        
+        // **** Location Tracker ****
+        //command "sendTheMap", ["string"]
+        command "deviceLoc", ["string"]
+        command "deviceOther", ["string"]
+	}
 }
-
+           
 preferences {
-    page(name: "Credentials", title: "Enter Life360 Credentials", content: "getCredentialsPage", nextPage: "testLife360Connection", install: false)
-    page(name: "listCirclesPage", title: "Select Life360 Circle", content: "listCircles", install: false)
-    page(name: "myPlaces", title: "My Places", content: "myPlaces", install: true)
-}
-
-mappings {
-	path("/placecallback") {
-		action: [
-              POST: "placeEventHandler",
-              GET: "placeEventHandler"
-		]
-	}
+	input title:"<b>Location Tracker User</b>", description:"Note: Any changes will take effect only on the NEXT update or forced refresh. Items with (Places) are optional and only needed when the NEW Location Tracker app is released", type:"paragraph", element:"paragraph"
     
-    path("/receiveToken") {
-		action: [
-            POST: "receiveToken",
-            GET: "receiveToken"
-		]
+    input "apiKey", "text", title: "API Key from Google Maps (Places)", required: false
+    input "consumerKey", "text", title: "Consumer Key from MapQuest (Places)", required: false
+    input "threshold", "number", title: "Min minutes between checks (Places)", required: false, defaultValue: 2
+    input "avatarURL", "text", title: "Avatar URL (Places)", required: false
+        
+	input "units", "enum", title: "Distance Units", description: "Miles or Kilometers", required: false, options:["Kilometers","Miles"]
+    input "avatarFontSize", "text", title: "Avatar Font Size", required: true, defaultValue: "15"
+    input "avatarSize", "text", title: "Avatar Size by Percentage", required: true, defaultValue: "75"
+
+    input "historyFontSize", "text", title: "History Font Size", required: true, defaultValue: "15"
+    input "historyHourType", "bool", title: "Time Selection for History Tile (Off for 24h, On for 12h)", required: false, defaultValue: false
+    input "logEnable", "bool", title: "Enable logging", required: true, defaultValue: false
+} 
+      
+def sendTheMap(theMap) {
+    lastMap = "${theMap}" 
+    sendEvent(name: "lastMap", value: lastMap, displayed: true)
+}
+    
+def sendStatusTile1() {
+    if(logEnable) log.debug "In sendStatusTile1 - Making the Avatar Tile"    
+    def avat = device.currentValue('avatar')
+    if(avat == null || avat == "") avat = avatarURL
+    def add1 = device.currentValue('address1')
+    def bLevel = device.currentValue('battery')
+    def bCharge = device.currentValue('powerSource')
+    def bSpeedKm = device.currentValue('speedKm')
+    def bSpeedMiles = device.currentValue('speedMiles')
+
+    if(add1 == "No Data") add1 = "Between Places"
+    
+    def binTransit = device.currentValue('inTransit')
+    if(binTransit == "true") {
+        binTransita = "Moving"
+    } else {
+        binTransita = "Not Moving"
+    }
+
+    def bWifi = device.currentValue('wifiState')
+    if(bWifi == "true") {
+        bWifiS = "Wifi"
+    } else {
+        bWifiS = "No Wifi"
+    }
+
+    int sEpoch = device.currentValue('since')
+    if(sEpoch == null) {
+        theDate = use( groovy.time.TimeCategory ) {
+            new Date( 0 )
+        }
+    } else {
+        theDate = use( groovy.time.TimeCategory ) {
+            new Date( 0 ) + sEpoch.seconds
+        }
+    }
+    lUpdated = device.currentValue('lastUpdated')
+    sFont = avatarFontSize.toInteger() / 1.25
+    SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("E hh:mm a")
+    String dateSince = DATE_FORMAT.format(theDate)
+
+    theMap = "https://www.google.com/maps/search/?api=1&query=${device.currentValue('latitude')},${device.currentValue('longitude')}"
+    
+	tileMap = "<div style='overflow:auto;height:90%'><table width='100%'>"
+    tileMap += "<tr><td width='25%' align=center><img src='${avat}' height='${avatarSize}%'></td></tr>"
+    tileMap += "<td width='75%'><p style='font-size:${avatarFontSize}px'>"
+    tileMap += "<a href='${theMap}' target='_blank'>${add1}</a><br>"
+    tileMap += "${dateSince}<br>${device.currentValue('status')}<br>"
+    
+    if(units == "Kilometers") tileMap += "${binTransita} - ${bSpeedKm} KMH<br>"
+    if(units == "Miles") tileMap += "${binTransita} - ${bSpeedMiles} MPH<br>"
+    
+    tileMap += "Phone Lvl: ${bLevel} - ${bCharge} - ${bWifiS}<br></p>"
+    tileMap += "<p style='width:100%;text-align:right;font-size:${sFont}px'>${lUpdated}&nbsp; &nbsp; &nbsp; &nbsp;</p>"
+    tileMap += "</td></tr></table></div>"
+    
+	tileDevice1Count = tileMap.length()
+	if(tileDevice1Count <= 1000) {
+		if(logEnable) log.debug "tileMap - has ${tileDevice1Count} Characters<br>${tileMap}"
+	} else {
+		log.warn "In sendStatusTile1 - Too many characters to display on Dashboard (${tileDevice1Count})"
 	}
+	sendEvent(name: "bpt-statusTile1", value: tileMap, displayed: true)
+    
+    MurnControlMap = "<div style='overflow:auto;height:100%;width:100%;margin-left:4px'>"
+     if(add1 == "Home") MurnColor = "8eff00" else MurnColor = "0057D9"
+    if(add1 == "Away") MurnColor = "FF0000"
+    
+    MurnControlMap += "<p style='font-size:0.6em'><a href='${theMap}' target='_blank'>${add1}</a><br />${dateSince}</p>"
+    MurnControlMap += "<div><img src='${avat}' style='width:56%;height:56%;border-radius:50%;border:2px solid #${MurnColor}' /></div>"
+    //MurnControlMap += "<p style='font-size:0.6em'><a href='${theMap}' target='_blank'>${add1}</a><br />${dateSince}</p>"
+    MurnControlMap += "</div>"
+    
+	tileDevice1Count = MurnControlMap.length()
+	if(tileDevice1Count <= 1000) {
+		if(logEnable) log.debug "MurnControlMap - has ${tileDevice1Count} Characters<br>${MurnControlMap}"
+	} else {
+		log.warn "In sendStatusTile1 - Too many characters to display on Dashboard (${tileDevice1Count})"
+	}
+    sendEvent(name: "MurnControl-statusTile1", value: MurnControlMap, displayed: true)
 }
 
-def getCredentialsPage() {
-    if(logEnable) log.debug "In getCredentialsPage - (${state.version})"
-    if(state.life360AccessToken) {
-        listCircles()
-    } else {
-        dynamicPage(name: "Credentials", title: "Enter Life360 Credentials", nextPage: "listCirclesPage", uninstall: true, install:false){
-            section(getFormat("header-green", "${getImage("Blank")}"+" Life360 Credentials")) {
-    		    input "username", "text", title: "Life360 Username?", multiple: false, required: true
-    		    input "password", "password", title: "Life360 Password?", multiple: false, required: true, autoCorrect: false
-    	    }
-        }
-    }
-}
+def sendHistory(msgValue) {
+    if(logEnable) log.trace "In sendHistory - nameValue: ${msgValue}"
 
-def getCredentialsErrorPage(String message) {
-    if(logEnable) log.debug "In getCredentialsErrorPage - (${state.version})"
-    dynamicPage(name: "Credentials", title: "Enter Life360 Credentials", nextPage: "listCirclesPage", uninstall: uninstallOption, install:false) {
-    	section(getFormat("header-green", "${getImage("Blank")}"+" Life360 Credentials")) {
-    		input "username", "text", title: "Life360 Username?", multiple: false, required: true
-    		input "password", "password", title: "Life360 Password?", multiple: false, required: true, autoCorrect: false
-            paragraph "${message}"
-    	}
-    }
-}
-
-def testLife360Connection() {
-    if(logEnable) log.debug "In testLife360Connection - (${state.version})"
-    if(state.life360AccessToken) {
-        if(logEnable) log.debug "In testLife360Connection - Good!"
-        true
-    } else {
-        if(logEnable) log.debug "In testLife360Connection - Bad!"
-    	initializeLife360Connection()
-    }
-}
-
- def initializeLife360Connection() {
-    if(logEnable) log.debug "In initializeLife360Connection - (${state.version})"
-
-    initialize()
-
-    def username = settings.username
-    def password = settings.password
-
-    def url = "https://api.life360.com/v3/oauth2/token.json"
-        
-    def postBody =  "grant_type=password&" +
-    				"username=${username}&"+
-                    "password=${password}"
-
-    def result = null
-
-    try {
-       
-     		httpPost(uri: url, body: postBody, headers: ["Authorization": "Basic cFJFcXVnYWJSZXRyZTRFc3RldGhlcnVmcmVQdW1hbUV4dWNyRUh1YzptM2ZydXBSZXRSZXN3ZXJFQ2hBUHJFOTZxYWtFZHI0Vg==" ]) {response -> 
-     		    result = response
-    		}
-        if (result.data.access_token) {
-       		state.life360AccessToken = result.data.access_token
-            return true;
-       	}
-        return ;   
-    }
-    catch (e) {
-       log.error "Life360 initializeLife360Connection, error: $e"
-       return false;
-    }
-}
-
-def listCircles() {
-    if(logEnable) log.debug "In listCircles - (${state.version})"
-    def uninstallOption = false
-    if (app.installationState == "COMPLETE") uninstallOption = true
-    dynamicPage(name: "listCirclesPage", title: "", install: true, uninstall: true) {
-        display()
-
-    	if(testLife360Connection()) {
-    	    def urlCircles = "https://api.life360.com/v3/circles.json"
-    	    def resultCircles = null
-       
-		    httpGet(uri: urlCircles, headers: ["Authorization": "Bearer ${state.life360AccessToken}", timeout: 30 ]) {response -> 
-    	         resultCircles = response
-		    }
-
-    	    def circles = resultCircles.data.circles
+    if(msgValue.contains("No Data")) {
+       if(logEnable) log.trace "In sendHistory - Nothing to report (No Data)"
+    } else {   
+        try {
+            if(state.list1 == null) state.list1 = []
             
-            section(getFormat("header-green", "${getImage("Blank")}"+" Select Life360 Circle")) {
-        	    input "circle", "enum", multiple: false, required:true, title:"Life360 Circle", options: circles.collectEntries{[it.id, it.name]}, submitOnChange: true	
-            }
-            
-            if(circles) {
-                  state.circle = settings.circle
+            getDateTime()
+	        last = "${newDate} - ${msgValue}"
+            state.list1.add(0,last)  
+
+            if(state.list1) {
+                listSize1 = state.list1.size()
             } else {
-    	        getCredentialsErrorPage("Invalid Usernaname or password.")
+                listSize1 = 0
             }
+
+            int intNumOfLines = 10
+            if (listSize1 > intNumOfLines) state.list1.removeAt(intNumOfLines)
+            String result1 = state.list1.join(";")
+            def lines1 = result1.split(";")
+
+            theData1 = "<div style='overflow:auto;height:90%'><table style='text-align:left;font-size:${fontSize}px'><tr><td>"
+            
+            for (i=0;i<intNumOfLines && i<listSize1;i++) {
+                combined = theData1.length() + lines1[i].length()
+                if(combined < 1006) {
+                    theData1 += "${lines1[i]}<br>"
+                }
+            }
+
+            theData1 += "</table></div>"
+            if(logEnable) log.debug "theData1 - ${theData1.replace("<","!")}"       
+
+            dataCharCount1 = theData1.length()
+            if(dataCharCount1 <= 1024) {
+                if(logEnable) log.debug "What did I Say Attribute - theData1 - ${dataCharCount1} Characters"
+            } else {
+                theData1 = "Too many characters to display on Dashboard (${dataCharCount1})"
+            }
+  
+	        sendEvent(name: "bpt-history", value: theData1, displayed: true)
+            sendEvent(name: "numOfCharacters", value: dataCharCount1, displayed: true)
+            sendEvent(name: "lastLogMessage", value: msgValue, displayed: true)
         }
-
-        if(circle) {
-            if(logEnable) log.debug "In listPlaces - (${state.version})"
-            if (app.installationState == "COMPLETE") uninstallOption = true
-       
-            if (!state?.circle) state.circle = settings.circle
-
-            def url = "https://api.life360.com/v3/circles/${state.circle}/places.json"   
-            def result = null
-       
-            httpGet(uri: url, headers: ["Authorization": "Bearer ${state.life360AccessToken}", timeout: 30 ]) {response -> 
-     	        result = response
-            }
-
-            def places = result.data.places
-            
-            state.places = places
-            
-            section(getFormat("header-green", "${getImage("Blank")}"+" Select Life360 Place to Match Current Location")) {
-                paragraph "Please select the ONE Life360 Place that matches your Hubitat location: ${location.name}"
-                thePlaces = places.collectEntries{[it.id, it.name]}
-                sortedPlaces = thePlaces.sort { a, b -> a.value <=> b.value }
-                input "place", "enum", multiple: false, required:true, title:"Life360 Places: ", options: sortedPlaces, submitOnChange: true
-            }
-        }
-        
-        if(place && circle) {
-            if(logEnable) log.debug "In listUsers - (${state.version})"
-            if (app.installationState == "COMPLETE") uninstallOption = true
-            if (!state?.circle) state.circle = settings.circle
-
-            def url = "https://api.life360.com/v3/circles/${state.circle}/members.json"    
-            def result = null
-       
-            httpGet(uri: url, headers: ["Authorization": "Bearer ${state.life360AccessToken}", timeout: 30 ]) {response -> 
-     	        result = response
-            }
-
-            def members = result.data.members
-            state.members = members
-
-            section(getFormat("header-green", "${getImage("Blank")}"+" Select Life360 Members to Import into Hubitat")) {
-                theMembers = members.collectEntries{[it.id, it.firstName+" "+it.lastName]}
-                sortedMembers = theMembers.sort { a, b -> a.value <=> b.value }
-        	    input "users", "enum", multiple: true, required:false, title:"Life360 Members: ", options: sortedMembers, submitOnChange: true
-            }
-            
-            section(getFormat("header-green", "${getImage("Blank")}"+" Other Options")) {
-			    input(name: "logEnable", type: "bool", defaultValue: "false", submitOnChange: "true", title: "Enable Debug Logging", description: "Enable extra logging for debugging.")
-    	    }
-            display2()
+        catch(e1) {
+            log.warn "In sendHistory - Something went wrong<br>${e1}"
+            log.error e1
         }
     }
+    sendStatusTile1()
 }
 
 def installed() {
-    if(logEnable) log.debug "In installed - (${state.version})"
-	if(!state?.circle) state.circle = settings.circle
-    
-    settings.users.each {memberId->
-    	def member = state.members.find{it.id==memberId}
-        if(member) {
-          // Modified from @Stephack
-            def childDevice = childList()
-            if(childDevice.find{it.data.vcId == "${member}"}){
-                if(logEnable) log.debug "${member.firstName} already exists...skipping"
-            } else {
-                if(logEnable) log.debug "Creating Life360 Device: " + member
-                try{
-                    addChildDevice("BPTWorld", "Location Tracker User Driver", "${app.id}.${member.id}", 1234, ["name": "Life360 - ${member.firstName}", isComponent: false])
-                }
-                catch (e) {
-                    log.error "Child device creation failed with error = ${e}"
-                }
-            }
-          // end mod
-            
-            if (childDevice)
-        	{
-        		if(logEnable) log.debug "Child Device Successfully Created"
-     			generateInitialEvent (member, childDevice)
-       		}
-    	}
-    }
-    createCircleSubscription()
+    log.info "Location Tracker User Driver Installed"
+    historyClearData()
 }
-
-def createCircleSubscription() {
-    if(logEnable) log.debug "In createCircleSubscription - (${state.version})"
-    if(logEnable) log.debug "Remove any existing Life360 Webhooks for this Circle."
-
-    def deleteUrl = "https://api.life360.com/v3/circles/${state.circle}/webhook.json"
-    try { // ignore any errors - there many not be any existing webhooks
-
-    	httpDelete (uri: deleteUrl, headers: ["Authorization": "Bearer ${state.life360AccessToken}" ]) {response -> 
-     		result = response}
-    		}
-
-    catch (e) {
-
-    	log.debug (e)
-    }
-
-    // subscribe to the life360 webhook to get push notifications on place events within this circle
-
-    if(logEnable) log.debug "Create a new Life360 Webhooks for this Circle."
-    createAccessToken() // create our own OAUTH access token to use in webhook url   
-    def hookUrl = "${getApiServerUrl()}/${hubUID}/apps/${app.id}/placecallback?access_token=${state.accessToken}"
-    def url = "https://api.life360.com/v3/circles/${state.circle}/webhook.json"        
-    def postBody =  "url=${hookUrl}"
-    def result = null
-    try {
-     	httpPost(uri: url, body: postBody, headers: ["Authorization": "Bearer ${state.life360AccessToken}" ]) {response -> 
-     	result = response}
-    } catch (e) {
-        log.debug (e)
-    }
-
-    if (result.data?.hookUrl) {
-    	    if(logEnable) log.debug "Webhook creation successful."
-    	}
-    }
 
 def updated() {
-    if(logEnable) log.debug "In updated - (${state.version})"
-    if (!state?.circle) { state.circle = settings.circle }
-	if(logEnable) log.debug "In updated() method."
- 
-    settings.users.each {memberId->
-    	def externalId = "${app.id}.${memberId}"
-		def deviceWrapper = getChildDevice("${externalId}")
-        
-        if (!deviceWrapper) { // device isn't there - so we need to create
-    		member = state.members.find{it.id==memberId}           
-         // Modified from @Stephack  
-            def childDevice = childList()
-            if(childDevice.find{it.data.vcId == "${member}"}){
-                if(logEnable) log.debug "${member.firstName} already exists...skipping"
-            } else {
-                if(logEnable) log.debug "Creating Life360 Device: " + member
-                try{
-                    addChildDevice("BPTWorld", "Location Tracker User Driver", "${app.id}.${member.id}", 1234, ["name": "Life360 - ${member.firstName}", isComponent: false])
-                }
-                catch (e) {
-                    log.error "Child device creation failed with error = ${e}"
-                }
-            }
-        // end mod
-            
-        	if (childDevice) {
-        		if(logEnable) log.debug "Child Device Successfully Created"
- 				generateInitialEvent (member, childDevice)
-       		}
-    	}
-        else {
-          	// if(logEnable) log.debug "Find by Member Id = ${memberId}"
-    		def member = state.members.find{it.id==memberId}
-        	generateInitialEvent (member, deviceWrapper)
-        }
-    }
-
-    def childDevices = childList()   
-    if(logEnable) log.debug "Child Devices: ${childDevices}"   
-    childDevices.each {childDevice->
-        def (childAppName, childMemberId) = childDevice.deviceNetworkId.split("\\.")
-        if (!settings.users.find{it==childMemberId}) {
-            deleteChildDevice(childDevice.deviceNetworkId)
-            def member = state.members.find {it.id==memberId}
-            if (member) state.members.remove(member)
-        }
-    }
+    log.info "Location Tracker User Driver has been Updated"
 }
 
-def generateInitialEvent (member, childDevice) {  
-    if(logEnable) log.debug "In generateInitialEvent - (${state.version})"
-    runEvery1Minute(updateMembers)
-    try { // we are going to just ignore any errors
-        def place = state.places.find{it.id==settings.place}
+def getDateTime() {
+	def date = new Date()
+	if(historyHourType == false) newDate=date.format("E HH:mm")
+	if(historyHourType == true) newDate=date.format("E hh:mm a")
+    return newDate
+}
 
-		if (place) {
-        	def memberLatitude = new Float (member.location.latitude)
-            def memberLongitude = new Float (member.location.longitude)
-            def memberAddress1 = member.location.address1
-            def memberLocationName = member.location.name
-            def placeLatitude = new Float (place.latitude)
-            def placeLongitude = new Float (place.longitude)
-            def placeRadius = new Float (place.radius)
+def historyClearData() {
+	if(logEnable) log.debug "In historyClearData - Clearing the data"
+    msgValue = "-"
+    logCharCount = "0"
+    state.list1 = []	
+	historyLog = "Waiting for Data..."
+    sendEvent(name: "bpt-history", value: historyLog, displayed: true)
+    sendEvent(name: "numOfCharacters1", value: logCharCount1, displayed: true)
+    sendEvent(name: "lastLogMessage1", value: msgValue, displayed: true)
+}	
+
+// *********************************************************
+// **********  Start of Location Tracker - Places **********
+// *********************************************************
+
+// **** Location Tracker - Places ****
+def deviceLoc(date, time, latitude, longitude, locSpd, locAlt) {
+    if(logEnable) log.debug "In deviceLoc - date: ${date}, time: ${time}, Lat: ${latitude}, Lng: ${longitude}, locSpd: ${locSpd}, locAlt: ${locAlt}"
+    sendEvent(name: "lastUpdateDate", value: date)
+    sendEvent(name: "lastUpdateTime", value: time)
+    sendEvent(name: "latitude", value: latitude)
+    sendEvent(name: "longitude", value: longitude)
+    sendEvent(name: "locSpd", value: locSpd)
+    sendEvent(name: "locAlt", value: locAlt)
+    
+    getLocation(latitude, longitude)
+}
+
+// **** Location Tracker - Places ****
+def deviceOther(battery, wifi) {
+    if(logEnable) log.debug "In deviceOther - Batt: ${battery}, wifi: ${wifi}"
+    sendEvent(name: "battery", value: battery)
+    sendEvent(name: "wifiState", value: wifi)
+    //sendEvent(name: "activity", value: activity)
+    //sendEvent(name: "mapURL", value: mapURL)
+    
+    sendEvent( name: "lastLocationUpdate", value: "Last location update on:\r\n${formatLocalTime("MM/dd/yyyy @ h:mm:ss a")}" )
+    def date = new Date()
+    sendEvent(name: "lastUpdated", value: date.format("MM-dd - h:mm:ss a"))
+    sendStatusTile1()
+}
+
+// **** Location Tracker - Places ****
+def getLocation(latitude, longitude) {
+	if(logEnable) log.debug "In getLocation"
+    if(state.timeMin == null) state.timeMin = 5
+    getTimeDiff()
+    
+    // http://www.mapquestapi.com/geocoding/v1/reverse?key=KEY&location=30.333472,-81.470448&includeRoadMetadata=true&includeNearestIntersection=true
+
+    if(consumerKey) {
+        if(state.timeMin >= threshold) {
+            theUrl = "https://www.mapquestapi.com/geocoding/v1/reverse?key=${consumerKey}&location=${latitude},${longitude}&includeRoadMetadata=true&includeNearestIntersection=true"
+            def params = [uri: "${theUrl}", contentType: "application/json"]
+
+		    httpGet(params) { response ->
+			    theResults = response.data
+                //if(logEnable) log.debug "In getLocation - response: ${response.data}"
                 
-        	if(logEnable) log.debug "Member Location = ${memberLatitude}/${memberLongitude}"
-            if(logEnable) log.debug "Place Location = ${placeLatitude}/${placeLongitude}"
-            if(logEnable) log.debug "Place Radius = ${placeRadius}"
-        
-        	def distanceAway = haversine(memberLatitude, memberLongitude, placeLatitude, placeLongitude)*1000 // in meters   
-  			boolean isPresent = (distanceAway <= placeRadius)
+                address1 = theResults.results.locations.street.toString()
+                currentCity = theResults.results.locations.adminArea5.toString()
+                currentState = theResults.results.locations.adminArea3.toString()
+                currentpostalCode = theResults.results.locations.postalCode.toString()
+                
+                address1 = "${address1}".replace("[","").replace("]","")
+                currentCity = "${currentCity}".replace("[","").replace("]","")
+                currentState = "${currentState}".replace("[","").replace("]","")
+                currentpostalCode = "${currentpostalCode}".replace("[","").replace("]","")
+                
+                currentStateZip = "${currentState} ${currentpostalCode}"
+                currentCountry = "-"
+                
+                if(logEnable) log.debug "In getLocation - street: ${address1} - City: ${currentCity} - State: ${currentState} - postalCode: ${currentpostalCode}"
+                
+                newAddress = address1
+                oldAddress = device.currentValue('address1')
+                if(newAddress != oldAddress) {
+                    sendEvent(name: "address1prev", value: oldAddress)
+                    sendEvent(name: "address1", value: newAddress)
+                    sendEvent(name: "since", value: since)
 
-			if(logEnable) log.info "Life360 generateInitialEvent, member: ($memberLatitude, $memberLongitude), place: ($placeLatitude, $placeLongitude), radius: $placeRadius, dist: $distanceAway, present: $isPresent"
-              
-            def address1
-            def address2
-            def speed
-            def speedmeters
-            def speedMPH
-            def speedKPH 
-            def xplaces
-            def avatar
-            def lastUpdated
-
-            xplaces = state.places.name
-            lastUpdated = new Date()
-
-            if (member.avatar != null) {
-                avatar = member.avatar
-                avatarHtml =  "<img src= \"${avatar}\">"
-            } else {           
-                avatar = "not set"
-                avatarHtml = "not set"
+                    if(newAddress == "home" || newAddress == "Home") { 
+                        sendEvent(name: "presence", value: "present", isStateChange: true)
+                    } else {
+                        sendEvent(name: "presence", value: "not present", isStateChange: true)
+                    }
+                }
+                
+                prevAddress = device.currentValue('address1prev')
+                if(prevAddress == null) {
+                    sendEvent(name: "address1prev", value: "Lost")
+                }
+                
+                sendEvent(name: "currentCity", value: currentCity)
+                sendEvent(name: "currentStateZip", value: currentStateZip)
+                sendEvent(name: "currentCountry", value: currentCountry)
+                def lastRan = new Date()
+                long unxSince = lastRan.getTime()
+                state.unxSince = unxSince/1000
             }
-
-            /**  Start Fix **/       
-            if(member.location.name != null) {
-                if(member.location.name != member.location.address1) {
-                    log.warn "Life360 with States - Caught the issue, changing address1 to place " + member.location.name
-
-                    address1 = member.location.name
-                    address2 = "No Data"               
-                }
-            } 
-            /**  End Fix **/
-            
-            //Covert 0 1 to False True	
-            def charging = member.location.charge == "0" ? "false" : "true"
-            def moving = member.location.inTransit == "0" ? "false" : "true"
-            def driving = member.location.isDriving == "0" ? "false" : "true"
-            def wifi = member.location.wifiState == "0" ? "false" : "true"
-
-            //Fix Iphone -1 speed 
-            if(member.location.speed.toFloat() == -1){
-                speed = 0
-                speed = speed.toFloat()}
-            else
-                speed = member.location.speed.toFloat()
-
-            if(speed > 0 ) {
-                speedmeters = speed.toDouble().round(2)
-                speedMPH = speedmeters.toFloat() * 2.23694
-                speedMPH = speedMPH.toDouble().round(2)
-                speedKPH = speedmeters.toFloat() * 3.6
-                speedKPH = speedKPH.toDouble().round(2)
-            } else {
-                speedmeters = 0
-                speedMPH = 0
-                speedKPH = 0
-            }
-        
-            def battery = Math.round(member.location.battery.toDouble())
-            def latitude = member.location.latitude.toFloat()
-            def longitude = member.location.longitude.toFloat()
-
-            //Sent data	
-            //log.trace "1 - Distance Away: ${distanceAway}"
-            
-            childDevice?.extraInfo(address1, address2, battery, charging, distanceAway, member.location.endTimestamp, moving, driving, latitude, longitude, member.location.since, speedmeters, speedMPH, speedKPH, wifi, xplaces, avatar, avatarHtml, lastUpdated)
-        
-            childDevice?.generatePresenceEvent(isPresent, distanceAway)         
-        }    
-    }
-    catch (e) {
-        log.error e
-    }  
-}
-
-def initialize() {
-	// TODO: subscribe to attributes, devices, locations, etc.
-}
-
-def haversine(lat1, lon1, lat2, lon2) {
-    def R = 6372.8
-    // In kilometers
-    def dLat = Math.toRadians(lat2 - lat1)
-    def dLon = Math.toRadians(lon2 - lon1)
-    lat1 = Math.toRadians(lat1)
-    lat2 = Math.toRadians(lat2)
- 
-    def a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.sin(dLon / 2) * Math.sin(dLon / 2) * Math.cos(lat1) * Math.cos(lat2)
-    def c = 2 * Math.asin(Math.sqrt(a))
-    def d = R * c
-    return(d)
-}
-
-def placeEventHandler() {
-	if(logEnable) log.warn "Life360 placeEventHandler: params= THIS IS THE LINE I'M LOOKING FOR"
-
-    def circleId = params?.circleId
-    def placeId = params?.placeId
-    def userId = params?.userId
-    def direction = params?.direction
-    def timestamp = params?.timestamp
-    
-    if (placeId == settings.place) {
-		def presenceState = (direction=="in")
-		def externalId = "${app.id}.${userId}"
-        
-		// find the appropriate child device based on my app id and the device network id
-		def deviceWrapper = getChildDevice("${externalId}")
-
-		// invoke the generatePresenceEvent method on the child device
-		if (deviceWrapper) {
-			deviceWrapper.generatePresenceEvent(presenceState, 0)
-    		if(logEnable) log.debug "Life360 event raised on child device: ${externalId}"
-		}
-   		else {
-    		log.warn "Life360 couldn't find child device associated with inbound Life360 event."
-    	}
-    }
-}
-
-def refresh() {
-    listCircles()
-    updated()
-}
-
-def updateMembers(){
-    if(logEnable) log.debug "In updateMembers - (${state.version})"
-	if (!state?.circle) state.circle = settings.circle
-    
-    def url = "https://api.life360.com/v3/circles/${state.circle}/members.json"
-    def result = null
-    sendCmd(url, result)
-}
-
-def sendCmd(url, result){ 
-    def requestParams = [ uri: url, headers: ["Authorization": "Bearer ${state.life360AccessToken}"], timeout: 10 ]
-    asynchttpGet("cmdHandler", requestParams)
-}
-
-def cmdHandler(resp, data) { 
-    if(resp.getStatus() == 200 || resp.getStatus() == 207) {       
-        result = resp.getJson()	
-    	def members = result.members
-    	state.members = members
-    
-	    settings.users.each {memberId->
-    	    def externalId = "${app.id}.${memberId}"
-   	        def member = state.members.find{it.id==memberId}
-
-            try {
-                // find the appropriate child device based on my app id and the device network id
-
-                def deviceWrapper = getChildDevice("${externalId}") 
-                def address1
-                def address2
-                def speed
-                def speedMetric
-                def speedMiles
-                def speedKm
-                def xplaces
-                def lastUpdated
-
-                thePlaces = state.places.sort { a, b -> a.name <=> b.name }
-                lastUpdated = new Date()
-
-                if (member.avatar != null){
-                    avatar = member.avatar
-                    avatarHtml =  "<img src= \"${avatar}\">"
-                } else {
-                    avatar = "not set"
-                    avatarHtml = "not set"
-                }
-
-                if(member.location.address1 == null || member.location.address1 == "")
-                address1 = "No Data"
-                else
-                    address1 = member.location.address1
-
-                if(member.location.address2 == null || member.location.address2 == "")
-                address2 = "No Data"
-                else
-                    address2 = member.location.address2
-
-                //Covert 0 1 to False True	
-                def charging = member.location.charge == "0" ? "false" : "true"
-                def moving = member.location.inTransit == "0" ? "false" : "true"
-                def driving = member.location.isDriving == "0" ? "false" : "true"
-                def wifi = member.location.wifiState == "0" ? "false" : "true"
-
-                //Fix Iphone -1 speed 
-                if(member.location.speed.toFloat() == -1){
-                    speed = 0
-                    speed = speed.toFloat()}
-                else
-                    speed = member.location.speed.toFloat()
-
-                if(speed > 0 ) {
-                    speedMetric = speed.toDouble().round(2)
-                    speedMiles = speedMetric.toFloat() * 2.23694
-                    speedMiles = speedMiles.toDouble().round(2)
-                    speedKm = speedMetric.toFloat() * 3.6
-                    speedKm = speedKm.toDouble().round(2)
-                } else {
-                    speedMetric = 0
-                    speedMiles = 0
-                    speedKm = 0
-                }
-
-                def battery = Math.round(member.location.battery.toDouble())
-                def latitude = member.location.latitude.toFloat()
-                def longitude = member.location.longitude.toFloat()
-
-                def place = state.places.find{it.id==settings.place}
-                if(place) {
-                    def memberLatitude = new Float (member.location.latitude)
-                    def memberLongitude = new Float (member.location.longitude)
-                    def memberAddress1 = member.location.address1
-                    def memberLocationName = member.location.name
-                    def placeLatitude = new Float (place.latitude)
-                    def placeLongitude = new Float (place.longitude)
-                    def placeRadius = new Float (place.radius)
-                    def distanceAway = haversine(memberLatitude, memberLongitude, placeLatitude, placeLongitude)*1000 // in meters
-
-                    boolean isPresent = (distanceAway <= placeRadius)
-
-                    if(logEnable) log.info "Life360 Update member ($member.firstName): ($memberLatitude, $memberLongitude), place: ($placeLatitude, $placeLongitude), radius: $placeRadius, dist: $distanceAway, present: $isPresent"
-
-                    deviceWrapper.generatePresenceEvent(isPresent, distanceAway)
-                    
-                    //log.trace "2 - distanceAway: ${distanceAway}"
-                    
-                    deviceWrapper.extraInfo(address1, address2, battery, charging, distanceAway, member.location.endTimestamp, moving, driving, latitude, longitude, member.location.since, speedMetric, speedMiles, speedKm, wifi, xplaces, avatar, avatarHtml, lastUpdated)
-                } else {
-                    deviceWrapper.extraInfo(address1, address2, battery, charging, distanceAway, member.location.endTimestamp, moving, driving, latitude, longitude, member.location.since, speedMetric, speedMiles, speedKm, wifi, xplaces, avatar, avatarHtml, lastUpdated)
-                }
-            } catch(e) {
-                if(logEnable) log.debug "In cmdHandler - catch - member: ${member}"
-                if(logEnable) log.debug e
-            }
-        }     
-    }
-}
-
-def uninstalled() {
-	removeChildDevices(getChildDevices())
-}
-
-private removeChildDevices(delete) {
-	delete.each {deleteChildDevice(it.deviceNetworkId)}
-}
-
-def childList() {
-	def children = getChildDevices()
-    if(logEnable) log.debug "In childList - children: ${children}"
-	return children
-}
-
-// ********** Normal Stuff **********
-
-def getImage(type) {					// Modified from @Stephack Code
-    def loc = "<img src=https://raw.githubusercontent.com/bptworld/Hubitat/master/resources/images/"
-    if(type == "Blank") return "${loc}blank.png height=40 width=5}>"
-    if(type == "checkMarkGreen") return "${loc}checkMarkGreen2.png height=30 width=30>"
-    if(type == "optionsGreen") return "${loc}options-green.png height=30 width=30>"
-    if(type == "optionsRed") return "${loc}options-red.png height=30 width=30>"
-    if(type == "instructions") return "${loc}instructions.png height=30 width=30>"
-    if(type == "logo") return "${loc}logo.png height=60>"
-}
-
-def getFormat(type, myText="") {			// Modified from @Stephack Code   
-	if(type == "header-green") return "<div style='color:#ffffff;font-weight: bold;background-color:#81BC00;border: 1px solid;box-shadow: 2px 3px #A9A9A9'>${myText}</div>"
-    if(type == "line") return "<hr style='background-color:#1A77C9; height: 1px; border: 0;'>"
-    if(type == "title") return "<h2 style='color:#1A77C9;font-weight: bold'>${myText}</h2>"
-}
-
-def display() {
-    setVersion()
-    getHeaderAndFooter()
-    theName = app.label
-    if(theName == null || theName == "") theName = "New Child App"
-    section (getFormat("title", "${getImage("logo")}" + " ${state.name} - ${theName}")) {
-        paragraph "${state.headerMessage}"
-		paragraph getFormat("line")
-	}
-}
-
-def display2() {
-	section() {
-		paragraph getFormat("line")
-		paragraph "<div style='color:#1A77C9;text-align:center;font-size:20px;font-weight:bold'>${state.name} - ${state.version}</div>"
-        paragraph "${state.footerMessage}"
-	}       
-}
-
-def getHeaderAndFooter() {
-    //if(logEnable) log.debug "In getHeaderAndFooter (${state.version})"
-    def params = [
-	    uri: "https://raw.githubusercontent.com/bptworld/Hubitat/master/info.json",
-		requestContentType: "application/json",
-		contentType: "application/json",
-		timeout: 30
-	]
-    
-    try {
-        def result = null
-        httpGet(params) { resp ->
-            state.headerMessage = resp.data.headerMessage
-            state.footerMessage = resp.data.footerMessage
+        } else {
+            if(logEnable) log.debug "In getLocation - Can't check for current stats - Under the ${threshold} min threshold."
         }
-        //if(logEnable) log.debug "In getHeaderAndFooter - headerMessage: ${state.headerMessage}"
-        //if(logEnable) log.debug "In getHeaderAndFooter - footerMessage: ${state.footerMessage}"
     }
-    catch (e) {
-        state.headerMessage = "<div style='color:#1A77C9'><a href='https://github.com/bptworld/Hubitat' target='_blank'>BPTWorld Apps and Drivers</a></div>"
-        state.footerMessage = "<div style='color:#1A77C9;text-align:center'>BPTWorld<br><a href='https://github.com/bptworld/Hubitat' target='_blank'>Find more apps on my Github, just click here!</a><br><a href='https://paypal.me/bptworld' target='_blank'>Paypal</a></div>"
+    
+    if(apiKey) {
+        if(state.timeMin >= threshold) {
+            theUrl = "https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&result_type=street_address&key=${apiKey}"
+            
+            def params = [uri: "${theUrl}", contentType: "application/json"]
+
+		    httpGet(params) { response ->
+			    theResults = response.data
+                //if(logEnable) log.debug "In getLocation - response: ${response.data}"
+                
+                formatted_address = theResults.results.formatted_address.toString()
+                
+                formatted_address = "${formatted_address}".replace("[","").replace("]","")
+                
+                def currentAddress = formatted_address.split(",")
+                if(logEnable) log.debug "In getLocation  - 0: ${currentAddress[0]} - 1: ${currentAddress[1]} - 2: ${currentAddress[2]} - 3: ${currentAddress[3]}"
+                if(logEnable) log.debug "In getLocation  - street: ${currentAddress[0]} - City: ${currentAddress[1]} - State Zip: ${currentAddress[2]} - Country: ${currentAddress[3]}"
+                
+                newAddress = currentAddress[0]
+                oldAddress = device.currentValue('address1')
+                if(newAddress != oldAddress) {
+                    sendEvent(name: "address1prev", value: oldAddress)
+                    sendEvent(name: "address1", value: newAddress)
+                    sendEvent(name: "since", value: since)
+
+                    if(newAddress == "home" || newAddress == "Home") { 
+                        sendEvent(name: "presence", value: "present", isStateChange: true)
+                    } else {
+                        sendEvent(name: "presence", value: "not present", isStateChange: true)
+                    }
+                }
+                    
+                prevAddress = device.currentValue('address1prev')
+                if(prevAddress == null) {
+                    sendEvent(name: "address1prev", value: "Lost")
+                }
+                
+                sendEvent(name: "currentCity", value: currentAddress[1])
+                sendEvent(name: "currentStateZip", value: currentAddress[2])
+                sendEvent(name: "currentCountry", value: currentAddress[3])
+                def lastRan = new Date()
+                long unxSince = lastRan.getTime()
+                state.unxSince = unxSince/1000
+            }
+        } else {
+            if(logEnable) log.debug "In getLocation - Can't check for current stats - Under the ${threshold} min threshold."
+        }
+    }
+    def date = new Date()
+    sendEvent(name: "lastUpdated", value: date.format("MM-dd - h:mm:ss a"))
+    sendEvent( name: "lastLocationUpdate", value: "Last location update on:\r\n${formatLocalTime("MM/dd/yyyy @ h:mm:ss a")}" )
+    sendStatusTile1()
+}
+
+// **** Location Tracker - Places ****
+def getTimeDiff() {
+    try {
+        if(logEnable) log.debug "In getTimeDiff"
+   	    def now = new Date()
+        long unxNow = now.getTime()
+        unxNow = unxNow/1000
+        int unxSince = state.unxSince      
+        long timeDiff = Math.abs(unxNow-unxSince)
+        if(logEnable) log.debug "In getTimeDiff - since: ${unxSince}, Now: ${unxNow}, Diff: ${timeDiff}"   
+	    state.timeMin = (((timeDiff % 86400 ) % 3600 ) / 60).toInteger()   
+        if(logEnable) log.debug "In getTimeDiff - Time Diff: ${state.timeMin} mins"
+    } catch (e) {
+        if(logEnable) log.warn "In getTimeDiff - Something went wrong - setting Time Diff to 5 min so it will run - ERROR: ${e}"
     }
 }
+
+// *********************************************************
+// ***********  End of Location Tracker - Places ***********
+// *********************************************************
+
+// *********************************************************
+// ******************  Start of Life360  *******************
+// *********************************************************
+
+def generatePresenceEvent(boolean present, homeDistance) {
+	if(logEnable) log.debug "In generatePresenceEvent - present: $present - homeDistance: $homeDistance"
+    def presence = formatValue(present)
+	def linkText = getLinkText(device)
+	def descriptionText = formatDescriptionText(linkText, present)
+	def handlerName = getState(present)
+	
+	def results = [
+		name: "presence",
+		value: presence,
+		linkText: linkText,
+		descriptionText: descriptionText,
+		handlerName: handlerName,
+	]
+	if(logEnable) log.debug "In generatePresenceEvent - Generating Event: ${results}"
+	sendEvent (results)
+	
+    if(units == "Kilometers" || units == null || units == ""){
+	    def statusDistance = homeDistance / 1000
+	    def status = sprintf("%.2f", statusDistance.toDouble().round(2)) + " km from: Home"
+        if(status != device.currentValue('status')){
+            sendEvent( name: "status", value: status )
+            state.update = true
+        }
+    } else {
+	    def statusDistance = (homeDistance / 1000) / 1.609344 
+   	    def status = sprintf("%.2f", statusDistance.toDouble().round(2)) + " Miles from: Home"
+        if(status != device.currentValue('status')){
+   	        sendEvent( name: "status", value: status )
+            state.update = true
+        }
+        state.status = status
+    }
+	
+    def km = sprintf("%.2f", homeDistance / 1000)
+    if(km.toDouble().round(2) != device.currentValue('distanceKm')){
+        sendEvent( name: "distanceKm", value: km.toDouble().round(2) )
+        state.update = true
+    }
+
+    def miles = sprintf("%.2f", (homeDistance / 1000) / 1.609344)
+	if(miles.toDouble().round(2) != device.currentValue('distanceMiles')){    
+        sendEvent( name: "distanceMiles", value: miles.toDouble().round(2) )
+	    state.update = true
+    }
+
+    if(homeDistance.toDouble().round(2) != device.currentValue('distanceMetric')){
+	    sendEvent( name: "distanceMetric", value: homeDistance.toDouble().round(2) )
+	    state.update = true
+    }
+
+    if(state.update == true){
+	    sendEvent( name: "lastLocationUpdate", value: "Last location update on:\r\n${formatLocalTime("MM/dd/yyyy @ h:mm:ss a")}" )
+	    state.update = false
+    }
+    
+    sendStatusTile1()
+}
+
+// **** Life360 ****
+private extraInfo(address1,address2,battery,charge,endTimestamp,inTransit,isDriving,latitude,longitude,since,speedMetric,speedMiles,speedKm,wifiState,xplaces,avatar,avatarHtml,lastUpdated) {
+	//if(logEnable) log.debug "extrainfo = Address 1 = $address1 | Address 2 = $address2 | Battery = $battery | Charging = $charge | Last Checkin = $endTimestamp | Moving = $inTransit | Driving = $isDriving | Latitude = $latitude | Longitude = $longitude | Since = $since | Speedmeters = $speedMetric | SpeedMPH = $speedMiles | SpeedKPH = $speedKm | Wifi = $wifiState"
+	   
+    newAddress = address1
+    oldAddress = device.currentValue('address1')
+    if(newAddress != oldAddress) {
+        sendEvent(name: "address1prev", value: oldAddress)
+        sendEvent(name: "address1", value: newAddress)
+        sendEvent(name: "since", value: since)
+        
+        if(newAddress == "home" || newAddress == "Home") { 
+            sendEvent(name: "presence", value: "present", isStateChange: true)
+        } else {
+            sendEvent(name: "presence", value: "not present", isStateChange: true)
+        }
+	}
+
+    prevAddress = device.currentValue('address1prev')
+    if(prevAddress == null) {
+        sendEvent(name: "address1prev", value: "Lost")
+    }
+    
+    if(battery != device.currentValue('battery')) { sendEvent(name: "battery", value: battery) }    
+    if(charge != device.currentValue('charge')) { sendEvent(name: "charge", value: charge) }
+ 
+    if(inTransit != device.currentValue('inTransit')) { sendEvent(name: "inTransit", value: inTransit) }
+
+	def curDriving = device.currentValue('isDriving') 
+    if(isDriving != device.currentValue('isDriving')) { sendEvent(name: "isDriving", value: isDriving) }
+
+    def curlat = device.currentValue('latitude').toString()
+    latitude = latitude.toString()
+    if(latitude != curlat) { sendEvent(name: "latitude", value: latitude) }
+    
+    def curlong = device.currentValue('longitude').toString()
+    longitude = longitude.toString()
+    if(longitude != curlong) { sendEvent(name: "longitude", value: longitude) }
+    
+    if(speedMetric != device.currentValue('speedMetric')) { sendEvent(name: "speedMetric", value: speedMetric) }
+    
+    if(speedMiles != device.currentValue('speedMiles')) { sendEvent(name: "speedMiles", value: speedMiles) }
+    
+    if(speedKm != device.currentValue('speedKm')) { sendEvent(name: "speedKm", value: speedKm) }
+    
+    if(wifiState != device.currentValue('wifiState')) { sendEvent(name: "wifiState", value: wifiState) }
+    
+    setBattery(battery.toInteger(), charge.toBoolean(), charge.toString())
+
+    sendEvent(name: "savedPlaces", value: xplaces)
+    
+    sendEvent(name: "avatar", value: avatar)
+    
+    sendEvent(name: "avatarHtml", value: avatarHtml)
+
+    sendEvent(name: "lastUpdated", value: lastUpdated.format("MM-dd - h:mm:ss a"))
+    
+    sendStatusTile1()
+}
+
+// **** Life360 ****
+def setMemberId(String memberId) {
+   if(logEnable) log.debug "MemberId = ${memberId}"
+   state.life360MemberId = memberId
+}
+
+// **** Life360 ****
+private String formatValue(boolean present) {
+	if (present)
+	return "present"
+	else
+	return "not present"
+}
+
+// **** Life360 ****
+private formatDescriptionText(String linkText, boolean present) {
+	if (present)
+		return "Life360 User $linkText has arrived"
+	else
+	return "Life360 User $linkText has left"
+}
+
+// **** Life360 ****
+def getMemberId() {
+	if(logEnable) log.debug "MemberId = ${state.life360MemberId}"
+    return(state.life360MemberId)
+}
+
+// **** Life360 ****
+private getState(boolean present) {
+	if (present)
+		return "arrived"
+	else
+	return "left"
+}
+
+// **** Life360 ****
+def refresh() {
+	//parent.refresh()
+    return null
+}
+
+// **** Life360 ****
+def setBattery(int percent, boolean charging, charge) {
+    if(percent != device.currentValue("battery")) { sendEvent(name: "battery", value: percent) }
+    
+    def ps = device.currentValue("powerSource") == "BTRY" ? "false" : "true"
+    if(charge != ps) { sendEvent(name: "powerSource", value: (charging ? "DC":"BTRY")) }
+}
+
+// **** Life360 ****
+private formatLocalTime(format = "EEE, MMM d yyyy @ h:mm:ss a z", time = now()) {
+	def formatter = new java.text.SimpleDateFormat(format)
+	formatter.setTimeZone(location.timeZone)
+	return formatter.format(time)
+}
+
+// *********************************************************
+// *******************  End of Life360  ********************
+// *********************************************************
+
